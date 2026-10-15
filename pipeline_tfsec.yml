@@ -1,0 +1,120 @@
+pool: Dell-Laptop-Pool
+
+trigger: 
+- main
+- feature/*
+
+stages:
+  - stage: tfsec
+    displayName: tfsec
+    jobs:
+      - job: tfsecJob
+        steps:
+          - task: PowerShell@2
+            displayName: Terraform Security Scan
+            inputs:
+              targetType: inline
+              script: |
+                & "C:\tool\tfsec.exe" "$(System.DefaultWorkingDirectory)\environments\dev"
+
+                # if ($LASTEXITCODE -ne 0) {
+                #   throw "tfsec scan failed"
+                # }
+
+  - stage: validateStage
+    displayName: validate
+    jobs:
+      - job: validatejob
+        displayName: validate
+        steps:
+        - task: TerraformInstaller@1
+          inputs:
+            terraformVersion: 'latest'
+
+        - task: TerraformTask@5
+          inputs:
+            provider: 'azurerm'
+            command: 'init'
+            workingDirectory: '$(System.DefaultWorkingDirectory)/environments/dev'
+            backendServiceArm: 'sc-pipeline'
+            backendAzureRmOverrideSubscriptionID: 'b3cee294-daf0-4add-80fd-af9b8c01c64a'
+            backendAzureRmResourceGroupName: 'rg-project-Z'
+            backendAzureRmStorageAccountName: 'stgprojectz'
+            backendAzureRmContainerName: 'pipeline-con-z'
+            backendAzureRmKey: 'terraform.tfstate'
+        
+        - task: TerraformTask@5
+          inputs:
+            provider: 'azurerm'
+            command: 'validate'
+            workingDirectory: '$(System.DefaultWorkingDirectory)/environments/dev'
+
+  - stage: planStage
+    displayName: planStage
+    jobs:
+      - job: planJob
+        displayName: planjob
+        steps:
+        - task: TerraformInstaller@1
+          inputs:
+            terraformVersion: 'latest'
+        - task: TerraformTask@5
+          inputs:
+            provider: 'azurerm'
+            command: 'init'
+            workingDirectory: '$(System.DefaultWorkingDirectory)/environments/dev'
+            backendServiceArm: 'sc-pipeline'
+            backendAzureRmOverrideSubscriptionID: 'b3cee294-daf0-4add-80fd-af9b8c01c64a'
+            backendAzureRmResourceGroupName: 'rg-project-Z'
+            backendAzureRmStorageAccountName: 'stgprojectz'
+            backendAzureRmContainerName: 'pipeline-con-z'
+            backendAzureRmKey: 'terraform.tfstate'
+
+        - task: TerraformTask@5
+          inputs:
+            provider: 'azurerm'
+            command: 'apply'
+            workingDirectory: '$(System.DefaultWorkingDirectory)/environments/dev'
+            environmentServiceNameAzureRM: 'sc-pipeline'
+            environmentAzureRmOverrideSubscriptionID: 'b3cee294-daf0-4add-80fd-af9b8c01c64a'
+
+  - stage: manualApproval
+    pool: server
+    displayName: manualApproval
+    jobs:
+      - job: manualApproval
+        displayName: manualApproval
+        steps:
+        - task: ManualValidation@1
+          inputs:
+            notifyUsers: 'kindly review the plan stage before approve the request.'
+
+  - stage: applyStage
+    displayName: applyStage
+    jobs:
+      - job: applyJob
+        displayName: applyJob
+        steps:
+        - task: TerraformInstaller@1
+          inputs:
+            terraformVersion: 'latest'
+
+        - task: TerraformTask@5
+          inputs:
+            provider: 'azurerm'
+            command: 'init'
+            workingDirectory: '$(System.DefaultWorkingDirectory)/environments/dev'
+            backendServiceArm: 'sc-pipeline'
+            backendAzureRmOverrideSubscriptionID: 'b3cee294-daf0-4add-80fd-af9b8c01c64a'
+            backendAzureRmResourceGroupName: 'rg-project-Z'
+            backendAzureRmStorageAccountName: 'stgprojectz'
+            backendAzureRmContainerName: 'pipeline-con-z'
+            backendAzureRmKey: 'terraform.tfstate'
+
+        - task: TerraformTask@5
+          inputs:
+            provider: 'azurerm'
+            command: 'apply'
+            workingDirectory: '$(System.DefaultWorkingDirectory)/environments/dev'
+            environmentServiceNameAzureRM: 'sc-pipeline'
+            environmentAzureRmOverrideSubscriptionID: 'b3cee294-daf0-4add-80fd-af9b8c01c64a'
